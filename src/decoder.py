@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 
+
 class AttentionHead(nn.Module):
     """Single Attention Head with Masking Support.
 
@@ -48,24 +49,18 @@ class AttentionHead(nn.Module):
         scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(dim_k)  # (B, T, T)
 
         if mask is not None:
-            # Acepta máscaras (T,T), (1,T,T) o (B,T,T). Acepta float/bool con keep o block.
             m = mask.to(device=scores.device)
-            # Convertir a booleana de "keep"
             if m.dtype != torch.bool:
                 m_keep = m != 0
             else:
                 m_keep = m
-            # Si hay True por encima de la diagonal, es probable que ya sea "block"
-            # (True donde BLOQUEA). En ese caso, úsala tal cual.
             has_upper_true = bool(torch.any(torch.triu(m_keep, diagonal=1)))
             if has_upper_true:
                 m_block = m_keep
             else:
-                # keep-mask (True donde se permite) -> convertir a block-mask
                 m_block = ~m_keep
 
-            # Broadcast implícito funciona con (1,T,T) sobre (B,T,T)
-            scores = scores.masked_fill(m_block, float('-inf'))
+            scores = scores.masked_fill(m_block, float("-inf"))
 
         weights = torch.softmax(scores, dim=-1)
         output = torch.matmul(weights, v)
@@ -81,7 +76,7 @@ class AttentionHead(nn.Module):
         Returns:
             Tensor: Output tensor of shape (batch_size, seq_len, d_v).
         """
-        #TODO: Implement the forward pass for the attention head, now with masking.
+        # TODO: Implement the forward pass for the attention head, now with masking.
         q = self.wq(x)
         k = self.wk(x)
         v = self.wv(x)
@@ -89,6 +84,7 @@ class AttentionHead(nn.Module):
         output, _ = self.scaled_dot_product_attention(q, k, v, mask=mask)
 
         return output
+
 
 class MultiHeadAttention(nn.Module):
     """Multi-Head Attention mechanism with Masking Support.
@@ -108,7 +104,7 @@ class MultiHeadAttention(nn.Module):
 
     def __init__(self, d_model: int, num_attention_heads: int):
         super(MultiHeadAttention, self).__init__()
-        
+
         # TODO: Define the heads and linear layer
 
         self.d_model = d_model
@@ -129,7 +125,6 @@ class MultiHeadAttention(nn.Module):
 
         self.output_linear = nn.Linear(d_model, d_model, bias=False)
 
-
     def forward(self, hidden_state, mask=None):
         """Forward pass for the multi-head attention layer with optional causal mask.
 
@@ -141,10 +136,13 @@ class MultiHeadAttention(nn.Module):
             Tensor: Output tensor of shape (batch_size, seq_len, d_model).
         """
         # TODO: Implement the forward pass for the multi-head attention layer, now with masking.
-        head_outputs = [head(hidden_state, mask=mask) for head in self.heads]  # list of (B, T, head_dim)
+        head_outputs = [
+            head(hidden_state, mask=mask) for head in self.heads
+        ]  # list of (B, T, head_dim)
         concat = torch.cat(head_outputs, dim=-1)  # (B, T, d_model)
         x = self.output_linear(concat)  # (B, T, d_model)
         return x
+
 
 class FeedForward(nn.Module):
     """FeedForward module for the Transformer.
@@ -164,7 +162,7 @@ class FeedForward(nn.Module):
 
     def __init__(self, d_model: int, intermediate_size: int):
         super(FeedForward, self).__init__()
-        # TODO: Define the different layers 
+        # TODO: Define the different layers
         self.linear_1 = nn.Linear(d_model, intermediate_size)
         self.linear_2 = nn.Linear(intermediate_size, d_model)
         self.gelu = nn.GELU()
@@ -181,6 +179,7 @@ class FeedForward(nn.Module):
         # TODO: Implement the forward pass for the feed-forward network
         x = self.linear_2(self.gelu(self.linear_1(x)))
         return x
+
 
 class TransformerDecoderLayer(nn.Module):
     """Transformer Decoder Layer.
@@ -224,7 +223,7 @@ class TransformerDecoderLayer(nn.Module):
 
         # Masked self-attention + residual
         attn_in = self.layer_norm_1(x)
-        attn_out = self.self_attention(attn_in, mask=mask)   # (B, T, d_model)
+        attn_out = self.self_attention(attn_in, mask=mask)  # (B, T, d_model)
         x = x + attn_out
 
         # Feed-forward + residual
@@ -238,19 +237,19 @@ class TransformerDecoderLayer(nn.Module):
 class Embeddings(nn.Module):
     """Embeddings module for the Transformer.
 
-      This module combines token embeddings and positional embeddings and applies
-      layer normalization.
+    This module combines token embeddings and positional embeddings and applies
+    layer normalization.
 
-      Args:
-          vocab_size (int): The size of the vocabulary.
-          max_position_embeddings (int): The maximum number of positions for positional embeddings.
-          d_model (int): The dimension of the input embeddings.
+    Args:
+        vocab_size (int): The size of the vocabulary.
+        max_position_embeddings (int): The maximum number of positions for positional embeddings.
+        d_model (int): The dimension of the input embeddings.
 
-      Attributes:
-          token_embeddings (nn.Embedding): Embedding layer for token embeddings.
-          position_embeddings (nn.Embedding): Embedding layer for positional embeddings.
-          layer_norm (nn.LayerNorm): Layer normalization applied after combining embeddings.
-      """
+    Attributes:
+        token_embeddings (nn.Embedding): Embedding layer for token embeddings.
+        position_embeddings (nn.Embedding): Embedding layer for positional embeddings.
+        layer_norm (nn.LayerNorm): Layer normalization applied after combining embeddings.
+    """
 
     def __init__(self, vocab_size: int, max_position_embeddings: int, d_model: int):
         super(Embeddings, self).__init__()
@@ -283,6 +282,7 @@ class Embeddings(nn.Module):
 
         return embeddings
 
+
 class TransformerDecoder(nn.Module):
     """Transformer Decoder.
 
@@ -302,8 +302,15 @@ class TransformerDecoder(nn.Module):
         layers (nn.ModuleList): List of Transformer decoder layers.
     """
 
-    def __init__(self, vocab_size: int, max_position_embeddings: int, d_model: int,
-                num_attention_heads: int, intermediate_size: int, num_hidden_layers: int):
+    def __init__(
+        self,
+        vocab_size: int,
+        max_position_embeddings: int,
+        d_model: int,
+        num_attention_heads: int,
+        intermediate_size: int,
+        num_hidden_layers: int,
+    ):
         super(TransformerDecoder, self).__init__()
         # TODO: Define the embeddings layer and the decoder layers
         self.max_position_embeddings = max_position_embeddings
@@ -313,7 +320,7 @@ class TransformerDecoder(nn.Module):
                 TransformerDecoderLayer(
                     d_model=d_model,
                     num_attention_heads=num_attention_heads,
-                    intermediate_size=intermediate_size
+                    intermediate_size=intermediate_size,
                 )
                 for _ in range(num_hidden_layers)
             ]
@@ -339,16 +346,17 @@ class TransformerDecoder(nn.Module):
         # Embeddings
         x = self.embeddings(input_ids)  # (B, T, d_model)
 
-        keep = torch.tril(torch.ones(seq_len, seq_len, dtype=torch.bool, device=input_ids.device))
+        keep = torch.tril(
+            torch.ones(seq_len, seq_len, dtype=torch.bool, device=input_ids.device)
+        )
         mask = keep.unsqueeze(0).expand(batch_size, seq_len, seq_len)  # (B, T, T)
 
-        # Pila de capas
         for layer in self.layers:
             x = layer(x, mask)
 
-        # Normalización final
         x = self.final_layer_norm(x)
         return x  # (B, T, d_model)
+
 
 class TransformerForLanguageModeling(nn.Module):
     """Transformer model with a language modeling head for text generation.
@@ -366,8 +374,15 @@ class TransformerForLanguageModeling(nn.Module):
         lm_head (nn.Linear): Linear layer mapping hidden states to vocabulary logits.
     """
 
-    def __init__(self, vocab_size: int, max_position_embeddings: int, d_model: int,
-                 num_attention_heads: int, intermediate_size: int, num_hidden_layers: int):
+    def __init__(
+        self,
+        vocab_size: int,
+        max_position_embeddings: int,
+        d_model: int,
+        num_attention_heads: int,
+        intermediate_size: int,
+        num_hidden_layers: int,
+    ):
         super(TransformerForLanguageModeling, self).__init__()
         # TODO: Define the Transformer decoder and the language modeling head
         self.transformer_decoder = TransformerDecoder(
@@ -376,7 +391,7 @@ class TransformerForLanguageModeling(nn.Module):
             d_model=d_model,
             num_attention_heads=num_attention_heads,
             intermediate_size=intermediate_size,
-            num_hidden_layers=num_hidden_layers
+            num_hidden_layers=num_hidden_layers,
         )
         self.lm_head = nn.Linear(d_model, vocab_size, bias=False)
 
@@ -391,5 +406,5 @@ class TransformerForLanguageModeling(nn.Module):
         """
 
         # TODO: Implement the forward pass for the Transformer model
-        logits = self.lm_head(self.transformer_decoder(input_ids)) # (B, T, vocab_size)
+        logits = self.lm_head(self.transformer_decoder(input_ids))  # (B, T, vocab_size)
         return logits
